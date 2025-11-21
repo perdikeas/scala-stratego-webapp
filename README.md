@@ -91,3 +91,45 @@ For open source projects, say how it is licensed.
 
 ## Project status
 If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+
+## Proposal
+
+### User stories
+	When two players join the same game room, each secretly arranges their army pieces on
+	private board and can see when the opponent is ready so the match can begin.
+	Once the game starts, each player takes turns selecting one of their units and choosing
+	a valid move direction.
+	When a unit moves into an enemy piece, the server resolves the battle according to
+	Stratego rules and updates both clients—revealing only the outcome of that combat.
+	If a player’s Flag is captured, or they run out of movable pieces, the game ends for
+	both users. The final revealed board is shown, and players may start a rematch together.
+
+### Requirements
+	Players see their own entire board, while the opponent’s pieces remain hidden (fog-of
+	war) except when revealed in combat. The match begins once both players confirm their
+	initial setup.
+	During gameplay, the server handles:
+	1.turn order enforcement
+	2.validation of legal moves (no diagonal moves, no entering lakes, Scouts move unlimited
+	3.straight lines, etc.)
+	4.combat resolution according to Stratego rules
+	5.revealing only the two pieces involved in the fight and the resulting outcome
+	6.detecting win conditions (Flag captured or no movable pieces)
+
+During gameplay, the server handles:
+
+### Roles 
+	(3 person-team)
+	1st person :Backend game logic. 
+		Grid, check of bounds, valid placements, check players turn, when game ends
+	2nd person :Builds the UI.
+		Visual representations, what is clicked and what signal it sends 
+	3rd person : Communication between components and testing
+		combines the two parts and is responsible for tests 
+	ALL: everyone will make tests and help with the documentation, we we all help 
+		eachother when needed although we have some tasks predefined for everyone
+
+### Mock-ups
+
+![Both players have set up their pieces, time to move pieces forward](images/image0.jpeg)
+![Initial piece set-up, players must place their pieces on the board secretly](images/image1.jpeg)
