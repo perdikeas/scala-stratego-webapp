@@ -37,16 +37,23 @@ case class State(
     dead: Map[UserId,Set[Troop]],
     players: Vector[UserId],//Only 2,
     inCombat: Map[UserId, Troop],
-    phase: Phase
-);
-  /*
-  lazy val removed = matched.values.flatten.toSet
-  lazy val isFinished = matched.values.map(_.length).sum == cards.length
-  lazy val hasCorrectSelection = flipped.size > 1 && flipped.map(cards.apply).size == 1
-  */
-  
-  //lazy val isFinished = dead.values.exist(x => x.name== "flag")
-  //lazy val removed = hits
+    phase: Phase,
+    currentPlayer: UserId //whose turn it is
+){
+  //returns whether the game is finished or not
+  def isFinished: Boolean = 
+    dead.values.flatten.exists(_.name=="Flag")
+
+  /** Returns the winner(s) if the game is finished. */
+  def winners: Set[UserId] =
+    if !isFinished then Set.empty
+    else players.filter(p => !dead.getOrElse(p, Set()).exists(_.name == "Flag")).toSet
+
+  // Switch to the other player
+  def switchPlayer: State =
+    val nextPlayer = players.find(_ != currentPlayer).getOrElse(currentPlayer)
+    this.copy(currentPlayer = nextPlayer)
+}
 
 /** A view of the game's state.
   *
@@ -61,12 +68,12 @@ case class View(
 
 enum StateView:
 
-  case Placing(phase:PhaseView/*,board:Vector*/)
+  case Placing(phase:PhaseView, board: Vector[TroopView])
   /** The game is ongoing. */
-  case Playing(phase: PhaseView, currentPlayer: UserId, board: Vector[CardView])
+  case Playing(phase: PhaseView, currentPlayer: UserId, board: Vector[TroopView])
 
   /** The game is over (there may be multiple winners with the same score). */
-  case Finished(winnerIds: UserId)
+  case Finished(winnerIds: Set[UserId])
 
 enum PhaseView:
 
