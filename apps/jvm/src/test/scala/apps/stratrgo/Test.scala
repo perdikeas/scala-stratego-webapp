@@ -5,10 +5,16 @@ import cs214.webapp.utils.WebappSuite
 
 class Tests extends WebappSuite[Event, State, View]:
   val sm = Logic()
-
+    //Helper Functions
+    /*State of every player's view and StateView. */
+  def projectViews(userIds: Seq[UserId])(state: State) =
+    userIds.map(sm.project(state)).map(_.state)
+    
+/*=========From Memory game as referene tests... We can delete before Uploading ===================*/
   /** Projects a given state for each given player and extract the [[state]]
     * field of the result.
     */
+/*    
   def projectPlayingViews(userIds: Seq[UserId])(state: State) =
     USER_IDS
       .map(sm.project(state))
@@ -313,3 +319,5 @@ class Tests extends WebappSuite[Event, State, View]:
       u <- userIds
     do
       sm.project(s)(u).testViewWire
+
+*/
