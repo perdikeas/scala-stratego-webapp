@@ -9,7 +9,29 @@ class Tests extends WebappSuite[Event, State, View]:
     /*State of every player's view and StateView. */
   def projectViews(userIds: Seq[UserId])(state: State) =
     userIds.map(sm.project(state)).map(_.state)
-    
+  /** Initialize a simple state for two players. */
+  lazy val initState = sm.init(USER_IDS)
+
+  /** Helper: create a sample troop for placing. */
+  def testTroop(owner: UserId, name: String = "Scout", rank: Int = 2): Troop =
+    Troop(name, rank, owner)
+
+/*======== Wire Tests (Serialize Deserialize) ========*/
+  test("Stratego: Event wire "):
+    for
+      r <- 0 to 2
+      c <- 0 to 2
+    do
+      Event.SquareClicked(Coord(r, c)).testEventWire
+      Event.KeyPressed("A").testEventWire
+
+  test("Stratego: View wire"):
+    val troop = testTroop(UID0)
+    val view = View(
+      StateView.Playing(PhaseView.Attacking, UID0, Vector(TroopView.Uncovered(troop)))
+    )
+    view.testViewWire
+
 /*=========From Memory game as referene tests... We can delete before Uploading ===================*/
   /** Projects a given state for each given player and extract the [[state]]
     * field of the result.
