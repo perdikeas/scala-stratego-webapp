@@ -9,12 +9,127 @@ class Tests extends WebappSuite[Event, State, View]:
     /*State of every player's view and StateView. */
   def projectViews(userIds: Seq[UserId])(state: State) =
     userIds.map(sm.project(state)).map(_.state)
-  /** Initialize a simple state for two players. */
+  /* Initialize a simple state for two players. */
   lazy val initState = sm.init(USER_IDS)
 
-  /** Helper: create a sample troop for placing. */
+  /* Helper check that a given square is empty. */
+  def assertEmptySquare(state: State, coord: Coord): Unit =
+    val squareOpt = state.board.find(_.coord == coord)
+    assert(squareOpt.nonEmpty) //stops if its not empty 
+    assert(squareOpt.get.troop.isEmpty) // stops if there is an empty troop 
+
+  /* Helper pick a random empty square. */
+  def firstEmptySquare(state: State): Coord =
+    state.board.find(_.troop.isEmpty).get.coord
+
+  /* Helper create a sample troop for placing. */
   def testTroop(owner: UserId, name: String = "Scout", rank: Int = 2): Troop =
-    Troop(name, rank, owner)
+    Troop(name, rank, owner)//we only need to say the player for simplicity 
+
+// actual tests for the game 
+  test("Initial state has empty board and correct phase "):
+    assertEquals(initState.phase, Phase.PlacingTroops)
+    for sq <- initState.board do
+      assert(sq.troop.isEmpty)
+
+  test("initial state has exactly two players "):
+    assertEquals(initState.players.size, 2)
+    assert(initState.players.toSet == USER_IDS.toSet)
+
+  test("Players alternate placing troops correctly "):
+    val coord = firstEmptySquare(initState)
+    val troop = testTroop(initState.currentPlayer)
+    val stateAfterPlace = assertSingleRender:
+      sm.transition(initState)(initState.currentPlayer, Event.SquareClicked(coord))
+
+    // Should still be in placing phase
+    assertEquals(stateAfterPlace.phase, Phase.PlacingTroops)
+    // Current player switched
+    assertNotEquals(stateAfterPlace.currentPlayer, initState.currentPlayer)
+
+  test("Attacking phase starts after placing all troops "):
+    val filledBoard = initState.copy(
+      board = initState.board.map(sq =>
+        sq.copy(troop = Some(testTroop(initState.players.head)))
+      ),
+      phase = Phase.Attacking
+    )
+    assertEquals(filledBoard.phase, Phase.Attacking)
+
+  test("Attacking a square reveals both troops "):
+    val attacker = testTroop(UID0, "Sergeant", 4)
+    val defender = testTroop(UID1, "Miner", 3)
+    val attackerCoord = Coord(0, 0)
+    val defenderCoord = Coord(0, 1)
+
+    val state = initState.copy(
+      phase = Phase.Attacking,
+      board = Vector(
+        Square(attackerCoord, Some(attacker)),
+        Square(defenderCoord, Some(defender))
+      ),
+      currentPlayer = UID0
+    )
+
+    val result = assertSingleRender:
+      sm.transition(state)(UID0, Event.SquareClicked(defenderCoord))
+
+    // After attack, both should be revealed
+    val troopSquares = result.board.filter(_.troop.nonEmpty)
+    for sq <- troopSquares do
+      assert(sq.troop.get.revealed)
+
+  test("combat result removes losing troop "):
+    val attacker = testTroop(UID0, "Captain", 6)
+    val defender = testTroop(UID1, "Miner", 3)
+    val attackerCoord = Coord(0, 0)
+    val defenderCoord = Coord(0, 1)
+
+    val state = initState.copy(
+      phase = Phase.Attacking,
+      board = Vector(
+        Square(attackerCoord, Some(attacker)),
+        Square(defenderCoord, Some(defender))
+      ),
+      currentPlayer = UID0
+    )
+
+    val result = assertSingleRender:
+      sm.transition(state)(UID0, Event.SquareClicked(defenderCoord))
+
+    val survivingTroops = result.board.flatMap(_.troop)
+    // Captain 6 should survive
+    assert(survivingTroops.exists(_.name == "Captain"))
+    assert(!survivingTroops.exists(_.name == "Miner"))
+
+  test("The game ends when a flag is captured"):
+    val flagOwner = UID1
+    val flag = testTroop(flagOwner, "Flag", 0)
+    val attacker = testTroop(UID0, "Marshal", 10)
+    val flagCoord = Coord(0, 1)
+    val attackerCoord = Coord(0, 0)
+
+    val state = initState.copy(
+      phase = Phase.Attacking,
+      board = Vector(
+        Square(attackerCoord, Some(attacker)),
+        Square(flagCoord, Some(flag))
+      ),
+      currentPlayer = UID0
+    )
+
+    val result = assertSingleRender:
+      sm.transition(state)(UID0, Event.SquareClicked(flagCoord))
+
+    assert(result.isFinished)
+    val winners = result.winners
+    assert(winners.contains(UID0))
+
+  test("players cannot move during done phase "):
+    val doneState = initState.copy(phase = Phase.Done)
+    assertFailure[IllegalMoveException]:
+      sm.transition(doneState)(UID0, Event.SquareClicked(Coord(0, 0)))
+
 
 /*======== Wire Tests (Serialize Deserialize) ========*/
   test("Stratego: Event wire "):
