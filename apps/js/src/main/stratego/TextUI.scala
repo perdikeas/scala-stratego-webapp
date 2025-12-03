@@ -14,26 +14,36 @@ class TextUIInstance(userId: UserId, sendMessage: ujson.Value => Unit, target: T
     extends graphics.TextClientAppInstance[Event, View](userId, sendMessage, target):
     
     override val wire = stratego.Wire
-    /*val pieceSelected = Map(
-    "Left" -> key.Left,
-    "l" -> key.Left,
-    "Right" -> key.Right,
-    "r" -> key.Right,
-    "Up" -> key.Up,
-    "u" -> key.Up,
-    "Down" -> key.Down,
-    "d" -> Key.Down
-  )*/
     override def handleTextInput(view: View, text: String): Option[Event] =
-        def isOnlyLetters(s: String): Boolean =
-             s.forall(ch => Character.isLetter(ch))
-        def coord(s: String): (Int, Int) =
-            val parts = s.split(",")
-            (parts(0).toInt, parts(1).toInt)
-        
-        if (isOnlyLetters(text.toLowerCase())) then
-            //pieceSelected.get(text.toLowerCase())
-            //      .map(Event.KeyPressed.apply)
-            Event.KeyPressed(text.toLowerCase)
-        else
-            Event.SquareClicked(coord(text.toLowerCase()))
+        None
+    import cs214.webapp.client.graphics.{TextSegment as TS}
+    override def renderView(userId: UserId, view: View): Vector[TS] =
+        renderHeader() ++ renderInternal(view)
+    // end renderView
+
+    // start renderHeader
+    private def renderHeader(): Vector[TS] =
+        Vector(
+        TS(text = "Stratego: ", cssProperties = Map("font-weight" -> "bold", "font-size" -> "120%")),
+        TS("Pick pairs of matching cards!", cssProperties = Map("font-style" -> "italic", "font-size" -> "120%")),
+        TS("\n\n")
+        )
+    // end renderHeader
+
+    private def renderInternal(view: View): Vector[TS] = 
+        Vector(
+        TS(text = "Hello: ", cssProperties = Map("font-weight" -> "bold", "font-size" -> "120%")),
+        TS("\n\n")
+        )
+
+    // start css
+    override def css: String = super.css +
+        """
+        html {
+        background: #FAFAFA;
+        }
+        pre {
+        word-break: break-all;
+        }
+        """
+    // end css
