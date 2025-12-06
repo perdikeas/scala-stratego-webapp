@@ -83,6 +83,7 @@ class Logic extends StateMachine[Event, State, View]:
 //        nstate = GameLogic.handleClick(tmpState, coord)
         nstate = GameLogic.placeTroop(nstate, coord, troop)
     }
+    nstate = nstate.copy(phase = Phase.Attacking)
     nstate
 
   override def transition(state: State)(userId: UserId, event: Event): Try[Seq[Action[State]]] = Try:

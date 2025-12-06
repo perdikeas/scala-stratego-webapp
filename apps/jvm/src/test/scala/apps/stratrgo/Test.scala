@@ -1,6 +1,7 @@
-package apps.stratrgo
+package apps.stratego
 
 import cs214.webapp.*
+import cs214.webapp.Action
 import cs214.webapp.utils.WebappSuite
 
 class Tests extends WebappSuite[Event, State, View]:
