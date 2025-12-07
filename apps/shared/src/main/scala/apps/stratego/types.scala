@@ -37,6 +37,7 @@ case class State(
     dead: Map[UserId,Set[Troop]],
     players: Vector[UserId],//Only 2,
     inCombat: Map[UserId, Troop],
+    leftToPlace : Map[UserId, Set[Troop]], // troops left to be placed
     phase: Phase,
     currentPlayer: UserId //whose turn it is
 ){
@@ -68,9 +69,9 @@ case class View(
 
 enum StateView:
 
-  case Placing(phase:PhaseView, board: Vector[TroopView])
+  case Placing(phase:PhaseView, board: Vector[SquareView])
   /** The game is ongoing. */
-  case Playing(phase: PhaseView, currentPlayer: UserId, board: Vector[TroopView])
+  case Playing(phase: PhaseView, currentPlayer: UserId, board: Vector[SquareView])
 
   /** The game is over (there may be multiple winners with the same score). */
   case Finished(winnerIds: Set[UserId])
@@ -94,3 +95,7 @@ enum TroopView:
   case Covered
   case Uncovered(troop: Troop) //selectingPhase
   case DeadView(troop:Troop)
+
+enum SquareView:
+  case HasTroop(coord: Coord,troop: TroopView)
+  case Empty (coord:Coord)

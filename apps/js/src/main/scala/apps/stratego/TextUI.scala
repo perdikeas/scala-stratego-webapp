@@ -8,6 +8,7 @@ import cs214.webapp.client.graphics.{HTMLAttribute, TextClientAppInstance, Mouse
 import org.scalajs.dom
 import scala.scalajs.js.annotation.JSExportTopLevel
 import PhaseView.*
+import SquareView.*
 
 // start TextUI
 @JSExportTopLevel("stratego_text")
@@ -52,16 +53,17 @@ class TextUIInstance(userId: UserId, sendMessage: ujson.Value => Unit, target: d
     view.state match
       case StateView.Placing(phase, board) => 
         renderBoard(board, true, true)        
-      case StateView.Playing(phase, currentPlayer, board) => println("Playing")
+      case StateView.Playing(phase, currentPlayer, board) => 
+        println("Playing")
         renderBoard(board, true, true) 
       case StateView.Finished(winnerIds) => Vector(
               TS(text = "Congrats: ", cssProperties = Map("font-weight" -> "bold", "font-size" -> "120%")),
               TS("\n\n")
               )
-  private def renderBoard(board: Vector[TroopView], enabled: Boolean, allowClick: Boolean): Vector[TS] =
+  private def renderBoard(board: Vector[SquareView], enabled: Boolean, allowClick: Boolean): Vector[TS] =
     val oC = onClick(allowClick)
     board.zipWithIndex.map: (c, idx) =>
-      renderTroop(c, enabled, Map("font-size" -> "160%"), oC(idx))
+      renderSquare(c, enabled, Map("font-size" -> "160%"), oC(idx))
     .toVector.grouped(10)                       // split into rows of 10
     .flatMap(row => row :+ TS("\n"))   // add newline after each row
     .toVector
@@ -71,6 +73,37 @@ class TextUIInstance(userId: UserId, sendMessage: ujson.Value => Unit, target: d
     if allowClick then Some(() => sendEvent(Event.SquareClicked(Coord(idx % 10, idx / 10))))
     else None
 
+  private def renderSquare(
+      square: SquareView,
+      enabled: Boolean,
+      style: Map[String, String],
+      onClick: Option[() => Unit]
+  ): TS =
+    val squareIcon = square match
+      case SquareView.HasTroop(c,t) => t match
+        case TroopView.Uncovered(troop) =>
+          troop.name match
+            case "Bomb" => "💣"
+            case "Flag" => "🚩"
+            case _      => troop.rank.toString
+        case TroopView.Covered => "🟥"
+        case TroopView.DeadView(troop) => "x"
+      case SquareView.Empty(_) => "⬜"
+    val onMouseEvent = onClick//      .filter(_ => !alreadyMatched)
+      .map(handler =>
+        (evt: MouseEvent) =>
+          evt match
+            case MouseEvent.Click(_) => handler()
+            case _                   => ()
+      )      
+    val squareStyle =
+      Map("font-family" -> "var(--emoji)", "line-height" -> "1.3")
+        ++ (if onMouseEvent.nonEmpty then Map("cursor" -> "pointer") else Map())
+//        ++ (if alreadyMatched || !enabled then Map("opacity" -> "0.7") else Map())
+        ++ style
+    TS(squareIcon, cssProperties = squareStyle, onMouseEvent = onMouseEvent)
+
+//===After the change this is no longer used i think we can remove later
   private def renderTroop(
       troop: TroopView,
       enabled: Boolean,

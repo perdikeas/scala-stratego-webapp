@@ -67,12 +67,13 @@ class Logic extends StateMachine[Event, State, View]:
     println("init:")
     val state = State(board = GameLogic.emptyBoard(),              // or Vector.fill(100)(Square.empty)
       selectedSquare = None,
-      selectedTroop = None,
+      selectedTroop = Some(Troop("Flag", 0, clients.head)),
       dead = Map.empty[UserId, Set[Troop]],
       players = Vector.empty[UserId],
       inCombat = Map.empty[UserId, Troop],
       phase = Phase.PlacingTroops,
-      currentPlayer = "" // or some default UserId
+      currentPlayer = "", // or some default UserId
+      leftToPlace  = Map.empty[UserId, Set[Troop]]
     )
     
     val troops = initB(clients)

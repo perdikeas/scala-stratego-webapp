@@ -155,7 +155,9 @@ object GameLogic:
         //After handling the click, check if the game is finished
         checkGameOver(newState)
     
-    /**Convert the internal game State into a View-friendly StateView */
+/*????????????This exists twice also in View Logic I am commenting 
+this for now  possible removal???????????????????????????????????????????????*/
+    /**Convert the internal game State into a View-friendly StateView 
     def stateToView(state: State, currentPlayer: UserId): StateView =
         // Helper to convert a single troop into TroopView
         def troopToView(t:Troop):TroopView = 
@@ -190,4 +192,4 @@ object GameLogic:
                 )
 
             case Phase.Done =>
-                StateView.Finished(winnerIds = state.winners)
+                StateView.Finished(winnerIds = state.winners)*/

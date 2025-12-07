@@ -75,8 +75,9 @@ object Wire extends AppWire[Event, View]:
    just have different enums */
   object stateViewFormat extends WireFormat[StateView]:
     import StateView.*
-    /*board of the game */
-    val troopVectorWire = VectorWire(troopViewFormat)
+    /*board of the game 
+    val troopVectorWire = VectorWire(troopViewFormat)*///old 
+    val squareVectorWire = VectorWire(squareViewFormat)// new 
     val winnerIdsWire = SetWire(StringWire)
   
     override def encode(view: StateView): Value = view match
@@ -84,14 +85,14 @@ object Wire extends AppWire[Event, View]:
         Obj(
           "type" -> "Placing",
           "phase" -> phaseViewFormat.encode(phase),
-          "board" -> troopVectorWire.encode(board)
+          "board" -> squareVectorWire.encode(board)
         )
       case Playing(phase, currentPlayer, board) =>
         Obj(
           "type" -> "Playing",
           "phase" -> phaseViewFormat.encode(phase),
           "currentPlayer" -> currentPlayer,
-          "board" -> troopVectorWire.encode(board)
+          "board" -> squareVectorWire.encode(board)
         )
       case Finished(winnerIds) =>
         Obj(
@@ -104,13 +105,13 @@ object Wire extends AppWire[Event, View]:
         case "Placing" =>
           Placing(
             phase = phaseViewFormat.decode(js("phase")).get,
-            board = troopVectorWire.decode(js("board")).get.to(Vector)
+            board = squareVectorWire.decode(js("board")).get.to(Vector)
           )
         case "Playing" =>
           Playing(
             phase = phaseViewFormat.decode(js("phase")).get,
             currentPlayer = js("currentPlayer").str,
-            board = troopVectorWire.decode(js("board")).get.to(Vector)
+            board = squareVectorWire.decode(js("board")).get.to(Vector)
           )
         case "Finished" =>
           Finished(winnerIdsWire.decode(js("winnerIds")).get)
@@ -157,5 +158,30 @@ object Wire extends AppWire[Event, View]:
         case "Uncovered" => Uncovered(TroopFormat.decode(js("troop")).get)
         case "DeadView" => DeadView(TroopFormat.decode(js("troop")).get)
         case _ => throw DecodingException(s"Unexpected troop view: $js")
-  
+
+    //===square View ==========
+  object squareViewFormat extends WireFormat[SquareView]:
+    import SquareView.*
+
+    override def encode(v: SquareView): Value = v match
+      case Empty(coord) =>
+        Obj("type" -> "Empty", "coord" -> CoordFormat.encode(coord))
+      case HasTroop(coord, troopView) =>
+        Obj(
+          "type" -> "HasTroop",
+          "coord" -> CoordFormat.encode(coord),
+          "troop" -> troopViewFormat.encode(troopView)
+        )
+
+    override def decode(js: Value): Try[SquareView] = Try:
+      js("type").str match
+        case "Empty" =>
+          Empty(CoordFormat.decode(js("coord")).get)
+        case "HasTroop" =>
+          HasTroop(
+            CoordFormat.decode(js("coord")).get,
+            troopViewFormat.decode(js("troop")).get
+          )
+        case _ =>
+          throw DecodingException(s"Unexpected square view: $js")
   

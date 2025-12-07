@@ -11,11 +11,11 @@ object ViewLogic:
     else TroopView.Covered
 
   /** Convert the board from State to a board of TroopViews for the current player. */
-  def boardToView(board: Vector[Square], currentPlayer: UserId, dead: Map[UserId, Set[Troop]]): Vector[TroopView] =
+  def boardToView(board: Vector[Square], currentPlayer: UserId, dead: Map[UserId, Set[Troop]]): Vector[SquareView] =
     board.map { sq =>
       sq.troop match
-        case Some(t) => troopToView(t, currentPlayer, dead.getOrElse(t.owner, Set()))
-        case None => TroopView.Covered // empty square treated as covered for simplicity
+        case Some(t) => SquareView.HasTroop(sq.coord,troopToView(t, currentPlayer, dead.getOrElse(t.owner, Set())))
+        case None => SquareView.Empty(sq.coord)
     }
 
   /** Convert the game State to a StateView for the current player. */
