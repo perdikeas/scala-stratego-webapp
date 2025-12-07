@@ -1,16 +1,26 @@
 package apps.stratego
 
-
 import cs214.webapp.*
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
+import ujson.*
+
+/**
+  * Wire encoders/decoders for Stratego.
+  *
+  * These types are shared between server and client and tell the framework
+  * how to (de)serialize:
+  *   - Coord
+  *   - Troop
+  *   - Event
+  *   - View / StateView / SquareView / TroopView
+  */
 object Wire extends AppWire[Event, View]:
-  import Event.*
-  import View.*
-  import ujson.*
 
+  // ------------------------------------------------------------
+  // COORD FORMAT
+  // ------------------------------------------------------------
 
-  /*=== Helper function===
-    to serialize and deserialize coordinates */
+  /** JSON encoding for board coordinates. */
   object CoordFormat extends WireFormat[Coord]:
     override def encode(c: Coord): Value =
       Obj("row" -> c.row, "col" -> c.col)
@@ -18,157 +28,181 @@ object Wire extends AppWire[Event, View]:
     override def decode(js: Value): Try[Coord] = Try:
       Coord(js("row").num.toInt, js("col").num.toInt)
 
+  // ------------------------------------------------------------
+  // TROOP FORMAT
+  // ------------------------------------------------------------
 
-  /*=== Helper function=== 
-    to serialize and deserialize Troops */
+  /** JSON encoding for Troop pieces. */
   object TroopFormat extends WireFormat[Troop]:
     override def encode(t: Troop): Value =
       Obj(
-        "name" -> t.name,
-        "rank" -> t.rank,
-        "owner" -> t.owner,
+        "name"     -> t.name,
+        "rank"     -> t.rank,
+        "owner"    -> t.owner,
         "revealed" -> t.revealed
       )
-  
+
     override def decode(js: Value): Try[Troop] = Try:
       Troop(
-        name = js("name").str,
-        rank = js("rank").num.toInt,
-        owner = js("owner").str,
+        name     = js("name").str,
+        rank     = js("rank").num.toInt,
+        owner    = js("owner").str,
         revealed = js("revealed").bool
       )
-  //===Event firnat serialize and deserialize===
-  
+
+  // ------------------------------------------------------------
+  // EVENT FORMAT
+  // ------------------------------------------------------------
+
+  /** JSON encoding for events sent from clients to server. */
   object eventFormat extends WireFormat[Event]:
-    import Event.*
-    /*Almost identical to the memory example i 
-    just added helper functions for the extra*/
     override def encode(e: Event): Value = e match
-      case SquareClicked(coord) =>
+      case Event.SquareClicked(coord) =>
         Obj("type" -> "SquareClicked", "coord" -> CoordFormat.encode(coord))
-      case KeyPressed(key) =>
+      case Event.KeyPressed(key) =>
         Obj("type" -> "KeyPressed", "key" -> key)
-  
+
     override def decode(js: Value): Try[Event] = Try:
       js("type").str match
         case "SquareClicked" =>
-          SquareClicked(CoordFormat.decode(js("coord")).get)
+          Event.SquareClicked(CoordFormat.decode(js("coord")).get)
         case "KeyPressed" =>
-          KeyPressed(js("key").str)
+          Event.KeyPressed(js("key").str)
         case _ =>
           throw DecodingException(s"Invalid Stratego event: $js")
-  
-  
-  // ==== View Format ====
-  /*for now our implementation only has state doesnt 
-  have matched like memmory or anything else so its a simpler version*/
+
+  // ------------------------------------------------------------
+  // VIEW FORMAT (top-level View wrapper)
+  // ------------------------------------------------------------
+
   object viewFormat extends WireFormat[View]:
     override def encode(v: View): Value =
       Obj("state" -> stateViewFormat.encode(v.state))
-  
+
     override def decode(js: Value): Try[View] = Try:
       View(stateViewFormat.decode(js("state")).get)
-    
-  
-  //==== StateView Format ====
-  /*again its pretty simillar to the memmory example we
-   just have different enums */
+
+  // ------------------------------------------------------------
+  // STATE VIEW FORMAT
+  // ------------------------------------------------------------
+
+  /** Encoding for the state viewed by clients (playing, placing, finished). */
   object stateViewFormat extends WireFormat[StateView]:
-    import StateView.*
-    /*board of the game 
-    val troopVectorWire = VectorWire(troopViewFormat)*///old 
-    val squareVectorWire = VectorWire(squareViewFormat)// new 
-    val winnerIdsWire = SetWire(StringWire)
-  
+
+    private val squareVectorWire = VectorWire(squareViewFormat)
+    private val winnerIdsWire    = SetWire(StringWire)
+    private val coordSetWire     = SetWire(CoordFormat)
+
     override def encode(view: StateView): Value = view match
-      case Placing(phase, board) =>
+      case StateView.Placing(phase, board) =>
         Obj(
-          "type" -> "Placing",
+          "type"  -> "Placing",
           "phase" -> phaseViewFormat.encode(phase),
           "board" -> squareVectorWire.encode(board)
         )
-      case Playing(phase, currentPlayer, board) =>
+
+      case StateView.Playing(phase, currentPlayer, board, selected, highlights) =>
         Obj(
-          "type" -> "Playing",
-          "phase" -> phaseViewFormat.encode(phase),
+          "type"          -> "Playing",
+          "phase"         -> phaseViewFormat.encode(phase),
           "currentPlayer" -> currentPlayer,
-          "board" -> squareVectorWire.encode(board)
+          "board"         -> squareVectorWire.encode(board),
+          "selected"      -> selected.map(CoordFormat.encode).getOrElse(Null),
+          "highlights"    -> coordSetWire.encode(highlights)
         )
-      case Finished(winnerIds) =>
+
+      case StateView.Finished(winnerIds) =>
         Obj(
-          "type" -> "Finished",
+          "type"      -> "Finished",
           "winnerIds" -> winnerIdsWire.encode(winnerIds)
         )
-  
+
     override def decode(js: Value): Try[StateView] = Try:
       js("type").str match
         case "Placing" =>
-          Placing(
+          StateView.Placing(
             phase = phaseViewFormat.decode(js("phase")).get,
             board = squareVectorWire.decode(js("board")).get.to(Vector)
           )
+
         case "Playing" =>
-          Playing(
-            phase = phaseViewFormat.decode(js("phase")).get,
+          val selectedVal = js("selected")
+          val selectedOpt =
+            if selectedVal == Null then None
+            else Some(CoordFormat.decode(selectedVal).get)
+
+          StateView.Playing(
+            phase         = phaseViewFormat.decode(js("phase")).get,
             currentPlayer = js("currentPlayer").str,
-            board = squareVectorWire.decode(js("board")).get.to(Vector)
+            board         = squareVectorWire.decode(js("board")).get.to(Vector),
+            selected      = selectedOpt,
+            highlights    = coordSetWire.decode(js("highlights")).get
           )
+
         case "Finished" =>
-          Finished(winnerIdsWire.decode(js("winnerIds")).get)
-        case _ =>
-          throw DecodingException(s"Unexpected state view: $js")
-  
-  
-  
-  // ==== PhaseView wire format =====
-  /*againg identical to memmory game 
-    i want to ask a ta why the dont encode,decode each part of the enum 
-    and just turn it to string on memory game (maybe because it 
-    doesnt have parameters and they are all just names*/
+          StateView.Finished(
+            winnerIdsWire.decode(js("winnerIds")).get
+          )
+
+        case other =>
+          throw DecodingException(s"Unexpected state view: $other")
+
+  // ------------------------------------------------------------
+  // PHASE VIEW FORMAT
+  // ------------------------------------------------------------
+
+  /** Encode PhaseView using its string name (like in the memory example). */
   object phaseViewFormat extends WireFormat[PhaseView]:
-    import PhaseView.*
-  
     override def encode(p: PhaseView): Value =
       Str(p.toString)
-  
+
     override def decode(js: Value): Try[PhaseView] = Try:
       try PhaseView.valueOf(js.str)
       catch
         case _: IllegalArgumentException =>
           throw DecodingException(s"Unexpected phase view: $js")
-  
-  // ====TroopView wire format ====
-  /*serialize and deserialize the troops again same as cardView of the example
-    just different names and enums */
-  
+
+  // ------------------------------------------------------------
+  // TROOP VIEW FORMAT
+  // ------------------------------------------------------------
+
+  /** Encode how a troop appears on the client (covered / uncovered / dead). */
   object troopViewFormat extends WireFormat[TroopView]:
-    import TroopView.*
-  
-    override def encode(v: TroopView): Value = v match
-      case Covered =>
+    override def encode(tv: TroopView): Value = tv match
+      case TroopView.Covered =>
         Obj("type" -> "Covered")
-      case Uncovered(troop) =>
+      case TroopView.Uncovered(troop) =>
         Obj("type" -> "Uncovered", "troop" -> TroopFormat.encode(troop))
-      case DeadView(troop) =>
+      case TroopView.DeadView(troop) =>
         Obj("type" -> "DeadView", "troop" -> TroopFormat.encode(troop))
-  
+
     override def decode(js: Value): Try[TroopView] = Try:
       js("type").str match
-        case "Covered" => Covered
-        case "Uncovered" => Uncovered(TroopFormat.decode(js("troop")).get)
-        case "DeadView" => DeadView(TroopFormat.decode(js("troop")).get)
-        case _ => throw DecodingException(s"Unexpected troop view: $js")
+        case "Covered" =>
+          TroopView.Covered
+        case "Uncovered" =>
+          TroopView.Uncovered(TroopFormat.decode(js("troop")).get)
+        case "DeadView" =>
+          TroopView.DeadView(TroopFormat.decode(js("troop")).get)
+        case _ =>
+          throw DecodingException(s"Unexpected troop view: $js")
 
-    //===square View ==========
+  // ------------------------------------------------------------
+  // SQUARE VIEW FORMAT
+  // ------------------------------------------------------------
+
+  /** Encode what is rendered at a particular board coordinate. */
   object squareViewFormat extends WireFormat[SquareView]:
-    import SquareView.*
-
     override def encode(v: SquareView): Value = v match
-      case Empty(coord) =>
-        Obj("type" -> "Empty", "coord" -> CoordFormat.encode(coord))
-      case HasTroop(coord, troopView) =>
+      case SquareView.Empty(coord) =>
         Obj(
-          "type" -> "HasTroop",
+          "type"  -> "Empty",
+          "coord" -> CoordFormat.encode(coord)
+        )
+
+      case SquareView.HasTroop(coord, troopView) =>
+        Obj(
+          "type"  -> "HasTroop",
           "coord" -> CoordFormat.encode(coord),
           "troop" -> troopViewFormat.encode(troopView)
         )
@@ -176,12 +210,13 @@ object Wire extends AppWire[Event, View]:
     override def decode(js: Value): Try[SquareView] = Try:
       js("type").str match
         case "Empty" =>
-          Empty(CoordFormat.decode(js("coord")).get)
+          SquareView.Empty(CoordFormat.decode(js("coord")).get)
+
         case "HasTroop" =>
-          HasTroop(
+          SquareView.HasTroop(
             CoordFormat.decode(js("coord")).get,
             troopViewFormat.decode(js("troop")).get
           )
-        case _ =>
-          throw DecodingException(s"Unexpected square view: $js")
-  
+
+        case other =>
+          throw DecodingException(s"Unexpected square view: $other")
