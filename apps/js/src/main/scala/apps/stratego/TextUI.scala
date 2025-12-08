@@ -174,6 +174,7 @@ class TextUIInstance(
                 troop.name match
                   case "Bomb" => "💣"
                   case "Flag" => "🚩"
+                  case "Marshal" => "M"
                   case _      => troop.rank.toString
 
               val color =
