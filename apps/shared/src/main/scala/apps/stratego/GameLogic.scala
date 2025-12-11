@@ -191,10 +191,52 @@ object GameLogic:
   def handleClick(state: State, coord: Coord): State =
     val newState =
       state.phase match
-
         // We skip interactive placement in this version: troops are auto-placed
         case Phase.PlacingTroops =>
-          state
+          val myTroops :  Vector[Troop] = state.leftToPlace.getOrElse(state.currentPlayer,Vector.empty)
+          if myTroops.isEmpty then state
+          else
+          /// Clicked coordinate validity check
+            val maybeSquare = state.board.find(_.coord == coord)
+            if maybeSquare.isEmpty then state //if we clicked something else or nothing 
+            else
+              val square = maybeSquare.get 
+              // its an option so now we get the clicked square and can check if it has a troop inside 
+
+              // don't allow placing on occupied or lake squares
+              val occupied = square.troop.nonEmpty
+              val invalidTerrain = isLake(coord)
+
+              // only allow in your half of the board and the first two rows 
+              val validZone =
+                if state.currentPlayer == state.players(0) then coord.row >= 8 // bottom 2 rows
+                else coord.row <= 1                                            // top 2 rows
+
+              if occupied || invalidTerrain || !validZone then
+                state // we ignore invalid clicks
+              else
+                //get the troop to place
+                val troop = myTroops.head
+                val newBoard = state.board.map { sq =>
+                  if sq.coord == coord then sq.copy(troop = Some(troop))
+                  else sq
+                }
+                val newLeft = myTroops.tail
+                val updatedLeft = state.leftToPlace.updated(state.currentPlayer, newLeft)
+
+                      // Check if both players finished placing
+                val bothDone =
+                  updatedLeft.values.forall(_.isEmpty)
+                if bothDone then
+                  state.copy(
+                    board = newBoard,
+                    leftToPlace = updatedLeft,
+                    phase = Phase.Attacking,
+                    currentPlayer = state.players.head
+                  )
+                else
+                  // stay in placing phase, no switch
+                  state.copy(board = newBoard, leftToPlace = updatedLeft)
 
         // ATTACK PHASE: selection, movement, combat
         case Phase.Attacking =>

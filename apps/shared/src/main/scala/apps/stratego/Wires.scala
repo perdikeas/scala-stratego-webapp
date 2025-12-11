@@ -92,13 +92,15 @@ object Wire extends AppWire[Event, View]:
     private val squareVectorWire = VectorWire(squareViewFormat)
     private val winnerIdsWire    = SetWire(StringWire)
     private val coordSetWire     = SetWire(CoordFormat)
+    private val troopWire        = TroopFormat // for nextTroop field
 
     override def encode(view: StateView): Value = view match
-      case StateView.Placing(phase, board) =>
+      case StateView.Placing(phase, board,troop) =>
         Obj(
           "type"  -> "Placing",
           "phase" -> phaseViewFormat.encode(phase),
-          "board" -> squareVectorWire.encode(board)
+          "board" -> squareVectorWire.encode(board),
+          "nextTroop" -> troop.map(troopWire.encode).getOrElse(Null)
         )
 
       case StateView.Playing(phase, currentPlayer, board, selected, highlights) =>
@@ -122,7 +124,11 @@ object Wire extends AppWire[Event, View]:
         case "Placing" =>
           StateView.Placing(
             phase = phaseViewFormat.decode(js("phase")).get,
-            board = squareVectorWire.decode(js("board")).get.to(Vector)
+            board = squareVectorWire.decode(js("board")).get.to(Vector),
+            nextTroop =
+              if js.obj.contains("nextTroop") && js("nextTroop") != Null then
+                Some(troopWire.decode(js("nextTroop")).get)
+              else None
           )
 
         case "Playing" =>

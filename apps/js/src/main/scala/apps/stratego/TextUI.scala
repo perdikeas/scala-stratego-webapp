@@ -68,18 +68,19 @@ class TextUIInstance(
   /** Decide what to show depending on the server-side state. */
   private def renderInternal(view: View): Vector[TS] =
     view.state match
-      case StateView.Placing(phase, board) =>
-        renderSubHeaderPlacing(phase) ++ renderBoard(board, None, Set.empty)
+      case StateView.Placing(phase, board,troop) =>
+        renderSubHeaderPlacing(phase,troop) ++ renderBoard(board, None, Set.empty)
 
       case StateView.Playing(phase, currentPlayer, board, selected, highlights) =>
         renderSubHeaderPlaying(phase, currentPlayer) ++
           renderBoard(board, selected, highlights)
-
+          //renderDeadTroops(view)
       case StateView.Finished(winnerIds) =>
         renderFinished(winnerIds)
-
+  
+  
   /** Short text explaining what's happening during the placing phase. */
-  private def renderSubHeaderPlacing(phase: PhaseView): Vector[TS] =
+  private def renderSubHeaderPlacing(phase: PhaseView, troop: Option[Troop]): Vector[TS] =
     val text =
       phase match
         case ProperPlacement =>
@@ -88,7 +89,16 @@ class TextUIInstance(
           "Waiting for the other player to finish placing troops.\n\n"
         case _ =>
           "\n"
-    Vector(TS(text))
+    val troopText = troop match 
+      case Some(t1) =>
+        val iconStr = t1.name match
+                  case "Bomb" => "💣"
+                  case "Flag" => "🚩"
+                  case "Marshal" => "M"
+                  case _      => t1.rank.toString
+        s"Next troop to place: $iconStr \n\n"
+      case _ => "No troops left to place \n\n"
+    Vector(TS(text+troopText))
 
   /** Short text explaining whose turn it is and what they can do. */
   private def renderSubHeaderPlaying(phase: PhaseView, currentPlayer: UserId): Vector[TS] =

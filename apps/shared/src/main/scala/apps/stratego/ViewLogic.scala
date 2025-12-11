@@ -41,17 +41,22 @@ object ViewLogic:
     val boardView = boardToView(state, currentPlayer)
 
     state.phase match
-
-      // Placing phase (not actively used in the auto-placed version, but kept for clarity)
       case Phase.PlacingTroops =>
+        val remaining: Vector[Troop] =
+          state.leftToPlace.getOrElse(currentPlayer, Vector.empty)
+
         val phaseView =
-          if currentPlayer == state.currentPlayer then PhaseView.ProperPlacement
+          if remaining.nonEmpty then PhaseView.ProperPlacement
           else PhaseView.WaitingPlacing
+
+        val nextTroopOpt = remaining.headOption
 
         StateView.Placing(
           phase = phaseView,
-          board = boardView
+          board = boardView,
+          nextTroop = nextTroopOpt
         )
+
 
       // Attacking phase: highlight selections and legal moves
       case Phase.Attacking =>

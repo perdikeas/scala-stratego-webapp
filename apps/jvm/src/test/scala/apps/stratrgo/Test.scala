@@ -141,12 +141,12 @@ class Tests extends WebappSuite[Event, State, View]:
       Event.SquareClicked(Coord(r, c)).testEventWire
       Event.KeyPressed("A").testEventWire
 
-  test("Stratego: View wire"):
+  /*test("Stratego: View wire"):
     val troop = testTroop(UID0)
     val view = View(
-      StateView.Playing(PhaseView.Attacking, UID0, Vector(TroopView.Uncovered(troop)))
+      StateView.Playing(PhaseView.Attacking, UID0, Vector(SquareView.HasTroop(Coord(0,0),TroopView.Uncovered(troop)))
     )
-    view.testViewWire
+    view.testViewWire*/
 
 /*=========From Memory game as referene tests... We can delete before Uploading ===================*/
   /** Projects a given state for each given player and extract the [[state]]

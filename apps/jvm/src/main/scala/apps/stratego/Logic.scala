@@ -66,6 +66,10 @@ class Logic extends StateMachine[Event, State, View]:
     val players = clients.toVector
     require(players.size == 2, s"Stratego expects exactly 2 players, got ${players.size}")
 
+    val allTroops = GameLogic.initTroops(players(0), players(1)) //All troops
+    val p1Troops = util.Random.shuffle(allTroops.take(20)) // player1 shuffled 
+    val p2Troops = util.Random.shuffle(allTroops.drop(20)) // player2 shuffled 
+
     // Base empty state
     val baseState = State(
       board          = GameLogic.emptyBoard(),
@@ -74,19 +78,19 @@ class Logic extends StateMachine[Event, State, View]:
       dead           = Map.empty[UserId, Set[Troop]],
       players        = players,
       inCombat       = Map.empty[UserId, Troop],
-      leftToPlace    = Map.empty[UserId, Set[Troop]],
-      phase          = Phase.Attacking,        // we start directly in attack mode with auto-setup
+      leftToPlace = Map(players(0) -> p1Troops.toVector, players(1) -> p2Troops.toVector),// each player has to place all the troops for the game to start
+      phase          = Phase.PlacingTroops,        
       currentPlayer  = players.head
     )
 
-    // Auto-place pieces
+    /* Auto-place pieces
     val placements = initialPlacement(players)
     val placedState =
       placements.foldLeft(baseState) { case (st, (coord, troop)) =>
         GameLogic.placeTroop(st, coord, troop)
-      }
+      }*/
 
-    placedState
+    baseState
 
   // ---------------------------------------------------------------------------
   // Transition
@@ -109,13 +113,21 @@ class Logic extends StateMachine[Event, State, View]:
     if state.phase == Phase.Done then
       throw IllegalMoveException("The game is already over!")
 
-    // Only current player may act
-    if userId != state.currentPlayer then
-      throw NotYourTurnException()
+    // Only current player may act if we are attacking otherwise both 
+    val effectiveState =
+      state.phase match
+        case Phase.PlacingTroops =>
+          // tell GameLogic who is placing right now both players can place at any time 
+          state.copy(currentPlayer = userId)
+        case _ =>
+          if userId != state.currentPlayer then
+            throw NotYourTurnException()
+          else
+            state // attacking 
 
     event match
       case Event.SquareClicked(coord) =>
-        val nextState = GameLogic.handleClick(state, coord)
+        val nextState = GameLogic.handleClick(effectiveState, coord)
         Seq(Render(nextState))
 
       case Event.KeyPressed(_) =>

@@ -45,7 +45,7 @@ case class State(
     dead: Map[UserId, Set[Troop]],        // captured / dead troops (stored as revealed)
     players: Vector[UserId],              // we expect 2 players
     inCombat: Map[UserId, Troop],         // reserved for future extensions
-    leftToPlace: Map[UserId, Set[Troop]], // reserved for manual placement mode
+    leftToPlace: Map[UserId, Vector[Troop]], // reserved for manual placement mode
     phase: Phase,
     currentPlayer: UserId                 // whose turn it is
 ):
@@ -73,7 +73,7 @@ case class View(
 enum StateView:
 
   /** Placement phase view (board + placement phase info). */
-  case Placing(phase: PhaseView, board: Vector[SquareView])
+  case Placing(phase: PhaseView, board: Vector[SquareView], nextTroop: Option[Troop])
 
   /** Ongoing game during attack phase. */
   case Playing(
