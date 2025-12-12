@@ -133,3 +133,11 @@ During gameplay, the server handles:
 
 ![Both players have set up their pieces, time to move pieces forward](images/image0.jpeg)
 ![Initial piece set-up, players must place their pieces on the board secretly](images/image1.jpeg)
+
+## Running the app
+To start the Stratego web app locally, run sbt run from the root of the repository. Once the 
+server has started, open a browser and go to http://localhost:8080, then select Stratego 
+from the welcome page. To play with two players, send the link to your friend who must 
+be on the same Wifi/LAN network. After inserting your User Id's both players place their 
+troops in the placement phase and then take turns moving and attacking according to the 
+Stratego rules.
