@@ -1,4 +1,4 @@
-package apps.stratego
+package apps.ul2025app100
 
 import cs214.webapp.*
 import scala.util.Try

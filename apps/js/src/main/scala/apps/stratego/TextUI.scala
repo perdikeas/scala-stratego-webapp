@@ -1,5 +1,4 @@
-package apps
-package stratego
+package apps.ul2025app100
 
 import cs214.webapp.*
 import cs214.webapp.client.*
@@ -16,7 +15,7 @@ import BoardConstants.*
 @JSExportTopLevel("stratego_text")
 object TextUI extends WSClientApp:
   /** App id must match the server app id (Logic.appInfo.id). */
-  def appId: String = "stratego"
+  def appId: String = "ul2025app100"
   /** UI id to distinguish between multiple frontends (e.g., text vs graphics). */
   def uiId: String  = "text"
 

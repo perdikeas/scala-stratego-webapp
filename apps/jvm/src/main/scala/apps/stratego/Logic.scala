@@ -1,5 +1,4 @@
-package apps
-package stratego
+package apps.ul2025app100
 
 import cs214.webapp.UserId
 import cs214.webapp.*
@@ -19,14 +18,14 @@ class Logic extends StateMachine[Event, State, View]:
 
   /** Information shown by the launcher / framework for this app. */
   val appInfo: AppInfo = AppInfo(
-    id = "stratego",
+    id = "ul2025app100",
     name = "Stratego",
     description = "A simple Stratego-inspired game.",
     year = 2025
   )
 
   /** Wire used both on server and client to encode Events / Views. */
-  override val wire = stratego.Wire
+  override val wire = Wire
 
   // ---------------------------------------------------------------------------
   // Initial state / setup
