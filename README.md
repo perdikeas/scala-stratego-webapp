@@ -1,143 +1,171 @@
-# ul2025app100
+# Stratego Web App 🎯
 
+A fully functional multiplayer **Stratego** board game implemented as a web application, built for the EPFL CS-214 Software Construction course (Fall 2025).
 
+The app runs a Scala backend server with a Scala.js frontend compiled to JavaScript, communicating over WebSockets. Two players connect to the same game room from their browsers, secretly place their troops, then take turns moving and attacking according to official Stratego rules — with fog of war, combat resolution, and win detection all handled server-side.
 
-## Getting started
+## Screenshots
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+**Welcome page — select Stratego to create a new game room**
+![Welcome](screenshots/welcome.png)
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+**Game room creation — enter two player IDs to start**
+![Room creation](screenshots/user-selection.png)
 
-## Add your files
+**Placement phase — place your troops secretly on your half of the board**
+![Placement phase](screenshots/game.png)
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Features
+
+- **Full Stratego rule implementation** — all 12 troop types with correct rank hierarchy, special rules for Spy, Miner, Bomb and Scout
+- **Secret troop placement phase** — each player places their 20 troops randomly shuffled on their half of the board before the game begins
+- **Fog of war** — opponent's pieces are hidden (shown as 🟥) until revealed in combat
+- **Combat resolution** — server-side battle logic handles all special cases: Spy kills Marshal, Miner defuses Bomb, equal ranks both die
+- **Scout movement** — Scouts can move any number of squares in a straight line, blocked by pieces and lakes
+- **Lakes** — four 2×2 impassable lake zones in standard Stratego positions
+- **Legal move highlighting** — clicking a piece highlights all valid destinations in yellow
+- **Turn enforcement** — server rejects moves from the wrong player
+- **Win detection** — game ends immediately when a player's Flag is captured
+- **Shareable room link** — the framework generates a unique room URL to send to your opponent
+- **Multiplayer over LAN/WiFi** — two players on the same network can play in real time via browser
+- **Emoji-based board rendering** — pieces rendered with emoji icons (💣 Bomb, 🚩 Flag, M Marshal, rank numbers for others)
+
+## Architecture
+
+The project follows a clean **client-server architecture** with a strict separation between game logic, view projection and UI rendering:
+
+**Server side (Scala JVM)**
+- `Logic` — the core `StateMachine` implementation; handles `init`, `transition` and `project`
+  - `init` — creates a new game state with 40 shuffled troops (20 per player) ready for placement
+  - `transition` — validates and applies `Event.SquareClicked` events; enforces turn order and phase rules; delegates to `GameLogic`
+  - `project` — converts the full internal `State` to a per-player `View`, hiding opponent pieces and computing legal move highlights via `ViewLogic`
+- `GameLogic` — pure, stateless game mechanics:
+  - Board creation and troop initialization (`initTroops`, `emptyBoard`)
+  - Movement validation including Scout multi-square movement and lake avoidance (`canReach`, `isLegalMove`, `isLegalAttack`, `legalDestinations`)
+  - Combat resolution with all Stratego special cases (`resolveCombat`)
+  - Click handling for placement and attack phases (`handleClick`)
+  - Win condition detection (`checkGameOver`)
+- `ViewLogic` — projects internal `State` to a per-player `StateView`, applying fog of war (hiding unrevealed enemy pieces as `TroopView.Covered`)
+- `State` — immutable case class holding: board, selected square, dead troops, turn order, placement queues, current phase
+- `Wire` — JSON serialization/deserialization of all `Event` and `View` types using `ujson`, shared between server and client
+
+**Client side (Scala.js → JavaScript)**
+- `TextUI` — the browser-side entry point, compiled to JavaScript via Scala.js
+- `TextUIInstance` — handles rendering and user input:
+  - `renderView` — renders the full board as a grid of clickable emoji squares
+  - `renderBoard` — maps each `SquareView` to a styled `TextSegment` with click handlers
+  - `renderSquare` — applies selection highlighting, legal move highlighting, fog of war styling and emoji icons per piece type
+  - `renderSubHeaderPlacing` / `renderSubHeaderPlaying` — contextual status messages per phase and player
+
+**Shared types**
+- `Coord`, `Troop`, `Square`, `Event`, `State`, `View`, `StateView`, `PhaseView`, `TroopView`, `SquareView`, `BoardConstants` — all defined once and used on both sides
+
+## How the Game Works
+
+### Placement Phase
+Both players are each assigned 20 randomly shuffled troops. They take turns clicking squares on their half of the board (bottom 2 rows for player 1, top 2 rows for player 2) to place troops one at a time. Once both players have placed all 20 troops the game moves automatically to the attack phase.
+
+### Attack Phase
+Players alternate turns. On your turn:
+1. Click one of your movable troops to select it — legal destinations highlight in yellow
+2. Click a highlighted square to move there, or click an enemy piece to attack
+
+**Combat:** when two pieces meet, the server resolves the fight:
+- Higher rank wins; both die on equal ranks
+- **Spy** (rank 1) kills the **Marshal** (rank 10) when attacking
+- **Miner** (rank 3) is the only piece that can defuse a **Bomb** (rank 11)
+- **Scouts** (rank 2) can move any number of squares in a straight line
+- **Bombs** and **Flags** cannot move
+
+**Win condition:** the game ends immediately when a player's Flag is captured.
+
+## Troop Reference
+
+| Troop | Rank | Count | Special Rule |
+|-------|------|-------|--------------|
+| Marshal | 10 | 1 | Loses to Spy |
+| General | 9 | 1 | — |
+| Colonel | 8 | 2 | — |
+| Major | 7 | 2 | — |
+| Captain | 6 | 2 | — |
+| Lieutenant | 5 | 2 | — |
+| Sergeant | 4 | 2 | — |
+| Miner | 3 | 2 | Defuses Bombs |
+| Scout | 2 | 2 | Moves any distance in straight line |
+| Spy | 1 | 1 | Kills Marshal when attacking |
+| Bomb | 11 | 2 | Immovable; kills all except Miner |
+| Flag | 0 | 1 | Immovable; capturing it wins the game |
+
+## Tech Stack
+
+- **Scala 3** — backend game logic and state machine
+- **Scala.js** — frontend compiled to JavaScript, runs in the browser
+- **WebSockets** — real-time bidirectional communication between server and clients
+- **ujson** — JSON serialization for the wire protocol
+- **sbt** — build tool
+- **cs214 webapp framework** — EPFL course framework providing the WebSocket server, client rendering primitives and app lifecycle management
+
+## Getting Started
+
+### Prerequisites
+- Java JDK 11 or higher
+- sbt ([install from scala-sbt.org](https://www.scala-sbt.org/download.html))
+
+### Running locally
+
+1. Clone the repository:
+```bash
+git clone https://github.com/perdikeas/scala-stratego-webapp.git
+cd scala-stratego-webapp
+```
+
+2. Start the server:
+```bash
+sbt run
+```
+
+3. Open your browser and go to:
+```
+http://localhost:8080
+```
+
+4. Select **Stratego** from the welcome page, enter two player IDs and click **Start!**
+
+5. Share the generated room URL with your opponent — they must be on the same WiFi/LAN network
+
+### Running tests
+
+```bash
+sbt test
+```
+
+The test suite covers: initialization, placement validation, movement rules, Scout multi-square movement, all combat special cases, turn enforcement and win detection.
+
+## Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.epfl.ch/cs214/ul/cs-214-2025-unguided-lab/ul2025app100.git
-git branch -M main
-git push -uf origin main
+apps/ul2025app100/
+├── jvm/src/main/scala/apps/ul2025app100/
+│   ├── Logic.scala          # StateMachine entry point (init, transition, project)
+│   ├── GameLogic.scala      # Pure game mechanics (movement, combat, click handling)
+│   ├── ViewLogic.scala      # State → per-player View projection (fog of war)
+│   ├── State.scala          # State, Coord, Troop, Square, Phase, View types
+│   ├── Wire.scala           # JSON serialization for Event and View
+│   └── MainJVM.scala        # Server entry point
+├── js/src/main/scala/apps/ul2025app100/
+│   ├── TextUI.scala         # Scala.js client entry point
+│   └── MainJS.scala         # Client bootstrap
+└── shared/src/main/scala/apps/ul2025app100/
+    └── SharedTypes.scala    # Types shared between server and client
 ```
 
-## Integrate with your tools
+## Authors
 
-- [ ] [Set up project integrations](https://gitlab.epfl.ch/cs214/ul/cs-214-2025-unguided-lab/ul2025app100/-/settings/integrations)
+- Konstantinos Perdikeas
+- Panagiotis Efthimios Valavanis
+- Antoine Ghaoui
 
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+EPFL — CS-214 Software Construction, Fall 2025
 
 ## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
-
-## Proposal
-
-### User stories
-	When two players join the same game room, each secretly arranges their army pieces on
-	private board and can see when the opponent is ready so the match can begin.
-	Once the game starts, each player takes turns selecting one of their units and choosing
-	a valid move direction.
-	When a unit moves into an enemy piece, the server resolves the battle according to
-	Stratego rules and updates both clients—revealing only the outcome of that combat.
-	If a player’s Flag is captured, or they run out of movable pieces, the game ends for
-	both users. The final revealed board is shown, and players may start a rematch together.
-
-### Requirements
-	Players see their own entire board, while the opponent’s pieces remain hidden (fog-of
-	war) except when revealed in combat. The match begins once both players confirm their
-	initial setup.
-	During gameplay, the server handles:
-	1.turn order enforcement
-	2.validation of legal moves (no diagonal moves, no entering lakes, Scouts move unlimited
-	3.straight lines, etc.)
-	4.combat resolution according to Stratego rules
-	5.revealing only the two pieces involved in the fight and the resulting outcome
-	6.detecting win conditions (Flag captured or no movable pieces)
-
-During gameplay, the server handles:
-
-### Roles 
-	(3 person-team)
-	1st person :Backend game logic. 
-		Grid, check of bounds, valid placements, check players turn, when game ends
-	2nd person :Builds the UI.
-		Visual representations, what is clicked and what signal it sends 
-	3rd person : Communication between components and testing
-		combines the two parts and is responsible for tests 
-	ALL: everyone will make tests and help with the documentation, we we all help 
-		eachother when needed although we have some tasks predefined for everyone
-
-### Mock-ups
-
-![Both players have set up their pieces, time to move pieces forward](images/image0.jpeg)
-![Initial piece set-up, players must place their pieces on the board secretly](images/image1.jpeg)
-
-## Running the app
-To start the Stratego web app locally, run sbt run from the root of the repository. Once the 
-server has started, open a browser and go to http://localhost:8080, then select Stratego 
-from the welcome page. To play with two players, send the link to your friend who must 
-be on the same Wifi/LAN network. After inserting your User Id's both players place their 
-troops in the placement phase and then take turns moving and attacking according to the 
-Stratego rules.
+MIT
